@@ -291,16 +291,13 @@ RUN \
         curl -sLO https://github.com/mpv-player/mpv/archive/v${MPV_VERSION}.tar.gz && \
         tar -zx --strip-components=1 -f v${MPV_VERSION}.tar.gz && \
         ./bootstrap.py && \
-        ./waf configure && \
+        ./waf configure --disable-gl --prefix=/usr/local && \
         ./waf && \
         ./waf install
 
 ## MKVToolNix https://mkvtoolnix.download/downloads.html
-
-COPY    MKVToolNix_GUI-42.0.0_1-x86_64.AppImage /usr/local/bin/
-RUN     cd /usr/local/bin && \
-        chmod a+x MKVToolNix_GUI-42.0.0_1-x86_64.AppImage && \
-        ln -s MKVToolNix_GUI-42.0.0_1-x86_64.AppImage mkvpropedit
+ADD     mkvpropedit.tgz /usr/local/
+RUN     chmod a+x /usr/local/bin/mkvpropedit
 
 ## other-transcode https://github.com/donmelton/other_video_transcoding
 RUN \
