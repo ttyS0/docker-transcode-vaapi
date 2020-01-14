@@ -1,14 +1,24 @@
+#
+# This heavily leverages jrottenberg's ffmpeg Dockerfile for ffmpeg:
+# https://github.com/jrottenberg/ffmpeg/blob/master/docker-images/4.2/vaapi/Dockerfile
+#
+# I've added the pieces needed by Don Melton's `other-transcode` script:
+# https://github.com/donmelton/other_video_transcoding
+#
+# In order to get hardware acceleration for a transcode, the `/dev/dri` device must
+# be bind mounted to the container. This container is intended to be used with
+# Intel GPUs.
+#
+# I've included the MKVToolNix AppImage file because FossHub is hostile towards
+# non-browser based downloading.
+#
+
 FROM        ubuntu:18.04 AS base
 
 WORKDIR     /tmp/workdir
 
-RUN     apt-get update && apt-get install -yq --no-install-recommends wget gnupg software-properties-common
-RUN     wget -q -O - https://mkvtoolnix.download/gpg-pub-moritzbunkus.txt | apt-key add -
-COPY    mkvtoolnix.download.list /etc/apt/sources.list.d/
-RUN     add-apt-repository ppa:mc3man/mpv-tests
-
 RUN     apt-get -yqq update && \
-        apt-get install -yq --no-install-recommends ca-certificates expat libgomp1 ruby-full mkvtoolnix mpv && \
+        apt-get install -yq --no-install-recommends ca-certificates expat libgomp1 ruby-full && \
         apt-get autoremove -y && \
         apt-get clean -y
 
@@ -47,6 +57,8 @@ ENV         FFMPEG_VERSION=4.2.2 \
             XORG_MACROS_VERSION=1.19.2 \
             XPROTO_VERSION=7.0.31 \
             XVID_VERSION=1.3.4 \
+            MPV_VERSION=0.31.0 \
+            OTHER_TRANSCODE_VERSION=0.2.0 \
             SRC=/usr/local
 
 ARG         FREETYPE_SHA256SUM="5d03dd76c2171a7601e9ce10551d52d4471cf92cd205948e60289251daddffa8 freetype-2.5.5.tar.gz"
@@ -118,78 +130,6 @@ RUN \
         ./multilib.sh && \
         make -C 8bit install && \
         rm -rf ${DIR}
-### libogg https://www.xiph.org/ogg/
-RUN \
-        DIR=/tmp/ogg && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO http://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.gz && \
-        echo ${OGG_SHA256SUM} | sha256sum --check && \
-        tar -zx --strip-components=1 -f libogg-${OGG_VERSION}.tar.gz && \
-        ./configure --prefix="${PREFIX}" --enable-shared  && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-### libopus https://www.opus-codec.org/
-RUN \
-        DIR=/tmp/opus && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://archive.mozilla.org/pub/opus/opus-${OPUS_VERSION}.tar.gz && \
-        echo ${OPUS_SHA256SUM} | sha256sum --check && \
-        tar -zx --strip-components=1 -f opus-${OPUS_VERSION}.tar.gz && \
-        autoreconf -fiv && \
-        ./configure --prefix="${PREFIX}" --enable-shared && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-### libvorbis https://xiph.org/vorbis/
-RUN \
-        DIR=/tmp/vorbis && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO http://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.gz && \
-        echo ${VORBIS_SHA256SUM} | sha256sum --check && \
-        tar -zx --strip-components=1 -f libvorbis-${VORBIS_VERSION}.tar.gz && \
-        ./configure --prefix="${PREFIX}" --with-ogg="${PREFIX}" --enable-shared && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-### libtheora http://www.theora.org/
-RUN \
-        DIR=/tmp/theora && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO http://downloads.xiph.org/releases/theora/libtheora-${THEORA_VERSION}.tar.gz && \
-        echo ${THEORA_SHA256SUM} | sha256sum --check && \
-        tar -zx --strip-components=1 -f libtheora-${THEORA_VERSION}.tar.gz && \
-        ./configure --prefix="${PREFIX}" --with-ogg="${PREFIX}" --enable-shared && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-### libvpx https://www.webmproject.org/code/
-RUN \
-        DIR=/tmp/vpx && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sL https://codeload.github.com/webmproject/libvpx/tar.gz/v${VPX_VERSION} | \
-        tar -zx --strip-components=1 && \
-        ./configure --prefix="${PREFIX}" --enable-vp8 --enable-vp9 --enable-vp9-highbitdepth --enable-pic --enable-shared \
-        --disable-debug --disable-examples --disable-docs --disable-install-bins  && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-### libwebp https://developers.google.com/speed/webp/
-RUN \
-        DIR=/tmp/vebp && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sL https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz | \
-        tar -zx --strip-components=1 && \
-        ./configure --prefix="${PREFIX}" --enable-shared  && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
 ### libmp3lame http://lame.sourceforge.net/
 RUN \
         DIR=/tmp/lame && \
@@ -198,19 +138,6 @@ RUN \
         curl -sL https://versaweb.dl.sourceforge.net/project/lame/lame/$(echo ${LAME_VERSION} | sed -e 's/[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\)/\1.\2/')/lame-${LAME_VERSION}.tar.gz | \
         tar -zx --strip-components=1 && \
         ./configure --prefix="${PREFIX}" --bindir="${PREFIX}/bin" --enable-shared --enable-nasm --enable-pic --disable-frontend && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-### xvid https://www.xvid.com/
-RUN \
-        DIR=/tmp/xvid && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO http://downloads.xvid.org/downloads/xvidcore-${XVID_VERSION}.tar.gz && \
-        echo ${XVID_SHA256SUM} | sha256sum --check && \
-        tar -zx -f xvidcore-${XVID_VERSION}.tar.gz && \
-        cd xvidcore/build/generic && \
-        ./configure --prefix="${PREFIX}" --bindir="${PREFIX}/bin" --datadir="${DIR}" --enable-shared --enable-shared && \
         make && \
         make install && \
         rm -rf ${DIR}
@@ -325,74 +252,6 @@ RUN \
         make install ; \
         rm -rf ${DIR}
 
-## libxcb (and supporting libraries) for screen capture https://xcb.freedesktop.org/
-RUN \
-        DIR=/tmp/xorg-macros && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://www.x.org/archive//individual/util/util-macros-${XORG_MACROS_VERSION}.tar.gz &&\
-        tar -zx --strip-components=1 -f util-macros-${XORG_MACROS_VERSION}.tar.gz && \
-        ./configure -prefix="${PREFIX}" && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-
-RUN \
-        DIR=/tmp/xproto && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://www.x.org/archive/individual/proto/xproto-${XPROTO_VERSION}.tar.gz &&\
-        tar -zx --strip-components=1 -f xproto-${XPROTO_VERSION}.tar.gz && \
-        ./configure -prefix="${PREFIX}" && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-
-RUN \
-        DIR=/tmp/libXau && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://www.x.org/archive/individual/lib/libXau-${XAU_VERSION}.tar.gz &&\
-        tar -zx --strip-components=1 -f libXau-${XAU_VERSION}.tar.gz && \
-        ./configure -prefix="${PREFIX}" && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-
-RUN \
-        DIR=/tmp/libpthread-stubs && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://xcb.freedesktop.org/dist/libpthread-stubs-${LIBPTHREAD_STUBS_VERSION}.tar.gz &&\
-        tar -zx --strip-components=1 -f libpthread-stubs-${LIBPTHREAD_STUBS_VERSION}.tar.gz && \
-        PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig" ./configure -prefix="${PREFIX}" && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-
-RUN \
-        DIR=/tmp/libxcb-proto && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://xcb.freedesktop.org/dist/xcb-proto-${XCBPROTO_VERSION}.tar.gz &&\
-        tar -zx --strip-components=1 -f xcb-proto-${XCBPROTO_VERSION}.tar.gz && \
-        ACLOCAL_PATH="${PREFIX}/share/aclocal" ./autogen.sh && \
-        PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig" ./configure -prefix="${PREFIX}" && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
-
-RUN \
-        DIR=/tmp/libxcb && \
-        mkdir -p ${DIR} && \
-        cd ${DIR} && \
-        curl -sLO https://xcb.freedesktop.org/dist/libxcb-${LIBXCB_VERSION}.tar.gz &&\
-        tar -zx --strip-components=1 -f libxcb-${LIBXCB_VERSION}.tar.gz && \
-        ACLOCAL_PATH="${PREFIX}/share/aclocal" ./autogen.sh && \
-        PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig" ./configure -prefix="${PREFIX}" --disable-static --enable-shared && \
-        make && \
-        make install && \
-        rm -rf ${DIR}
 
 ## ffmpeg https://ffmpeg.org/
 RUN  \
@@ -419,12 +278,7 @@ RUN \
         --enable-libvidstab \
         --enable-libmp3lame \
         --enable-libopenjpeg \
-        --enable-libopus \
-        --enable-libtheora \
-        --enable-libvorbis \
         --enable-libvpx \
-        --enable-libwebp \
-        --enable-libxcb \
         --enable-libx265 \
         --enable-libxvid \
         --enable-libx264 \
@@ -448,6 +302,29 @@ RUN \
         make qt-faststart && \
         cp qt-faststart ${PREFIX}/bin
 
+## mpv https://github.com/mpv-player/mpv
+RUN \
+        DIR=/tmp/mpv && mkdir -p ${DIR} && cd ${DIR} && \
+        curl -sLO https://github.com/mpv-player/mpv/archive/v${MPV_VERSION}.tar.gz && \
+        tar -zx --strip-components=1 -f v${MPV_VERSION}.tar.gz && \
+        ./bootstrap.py && \
+        ./waf configure && \
+        ./waf && \
+        ./waf install
+
+## MKVToolNix https://mkvtoolnix.download/downloads.html
+
+COPY    MKVToolNix_GUI-42.0.0_1-x86_64.AppImage /usr/local/bin/
+RUN     cd /usr/local/bin && \
+        chmod a+x MKVToolNix_GUI-42.0.0_1-x86_64.AppImage && \
+        ln -s MKVToolNix_GUI-42.0.0_1-x86_64.AppImage mkvpropedit
+
+## other-transcode https://github.com/donmelton/other_video_transcoding
+RUN \
+        curl -sLO https://raw.githubusercontent.com/donmelton/other_video_transcoding/${OTHER_TRANSCODE_VERSION}/bin/other-transcode && \
+        mv other-transcode /usr/local/bin/other-transcode && \
+        chmod a+x /usr/local/bin/other-transcode
+
 ## cleanup
 RUN \
         ldd ${PREFIX}/bin/ffmpeg | grep opt/ffmpeg | cut -d ' ' -f 3 | xargs -i cp {} /usr/local/lib/ && \
@@ -458,20 +335,16 @@ RUN \
 FROM        base AS release
 MAINTAINER  Sean Johnson <sean@ttys0.net>
 
-RUN   wget -O other-transcode https://raw.githubusercontent.com/donmelton/other_video_transcoding/0.2.0/bin/other-transcode && \
-      mv other-transcode /usr/local/bin/other-transcode && \
-      chmod a+x /usr/local/bin/other-transcode
-
 CMD         ["--help"]
 ENTRYPOINT  ["/usr/local/bin/other-transcode"]
 ENV         LD_LIBRARY_PATH=/usr/local/lib
 
 COPY --from=build /usr/local /usr/local/
 
-RUN \
-	apt-get update -y && \
-	apt-get install -y --no-install-recommends libva-drm2 libva2 i965-va-driver && \
-	rm -rf /var/lib/apt/lists/*
 
-# Let's make sure the app built correctly
-# Convenient to verify on https://hub.docker.com/r/jrottenberg/ffmpeg/builds/ console output
+RUN \
+        apt-get update -y && \
+	      apt-get install -y --no-install-recommends libva-drm2 libva2 i965-va-driver && \
+	      rm -rf /var/lib/apt/lists/*
+
+
