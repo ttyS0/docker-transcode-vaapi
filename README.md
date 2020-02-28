@@ -47,7 +47,7 @@ where `output_dir` is `$(pwd)`. Using that context, to transcode `source_file.mk
 ```
 cd output_dir
 docker run --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \ 
-  ttys0/other-transcode-vaapi:0.3.0 \
+  ttys0/other-transcode-vaapi \
   source_dir/source_file.mkv
 ```
 
@@ -57,7 +57,7 @@ container. For example, to target a bitrate of 2000 the above example would look
 ```
 cd output_dir
 docker run --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \
-  ttys0/other-transcode-vaapi:0.3.0 \
+  ttys0/other-transcode-vaapi \
   --target=2000 source_dir/source_file.mkv
 ```
 
