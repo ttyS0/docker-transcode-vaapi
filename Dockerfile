@@ -32,7 +32,7 @@ ARG        MAKEFLAGS="-j2"
 
 ENV         FFMPEG_VERSION=4.2.2 \
             AOM_VERSION=v1.0.0 \
-            FDKAAC_VERSION=0.1.5 \
+            FDKAAC_VERSION=2.0.1 \
             FONTCONFIG_VERSION=2.12.4 \
             FREETYPE_VERSION=2.5.5 \
             FRIBIDI_VERSION=0.19.7 \
@@ -44,10 +44,10 @@ ENV         FFMPEG_VERSION=4.2.2 \
             OPENCOREAMR_VERSION=0.1.5 \
             OPUS_VERSION=1.2 \
             OPENJPEG_VERSION=2.1.2 \
-            X264_VERSION=20170226-2245-stable \
-            X265_VERSION=3.1.1 \
+            X264_VERSION=20191217-2245-stable \
+            X265_VERSION=3.2.1 \
             MPV_VERSION=0.31.0 \
-            OTHER_TRANSCODE_VERSION=0.2.0 \
+            OTHER_TRANSCODE_VERSION=0.3.0 \
             SRC=/usr/local
 
 ARG         FREETYPE_SHA256SUM="5d03dd76c2171a7601e9ce10551d52d4471cf92cd205948e60289251daddffa8 freetype-2.5.5.tar.gz"
@@ -325,6 +325,7 @@ COPY --from=build /usr/local /usr/local/
 RUN \
         apt-get update -y && \
 	      apt-get install -y --no-install-recommends libva-drm2 libva2 i965-va-driver && \
+	      apt-get clean -y && \
 	      rm -rf /var/lib/apt/lists/*
 
 
