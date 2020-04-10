@@ -1,3 +1,7 @@
+## 0.3.0-1 (2020-04-09)
+
+* bumped `MPV` to v0.32.0
+
 ## 0.3.0 (2020-02-27)
 
 * switched to using [Docker Hub for publishing](https://hub.docker.com/r/ttys0/other-transcode-vaapi)
