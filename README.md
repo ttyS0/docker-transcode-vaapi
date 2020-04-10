@@ -3,64 +3,54 @@
 ## About
 
 
-[Don Melton](http://donmelton.com/) of [Video Transcoding](https://github.com/donmelton/video_transcoding) renown
-has brought hardware acceleration to bear in the form of [Other Video Transcoding](https://github.com/donmelton/other_video_transcoding). While Don and his troupe of video transcoding flagellants have well
-covered the installation and usage of `other-transcode` for all normal desktop platforms, Linux remains a bit
-of a challenge thanks to a diaspora of package management and custom software compilation. My approach to the
-problem is to wrap up `other-transcode` and its accouterments into a Docker container.
+[Don Melton](http://donmelton.com/) of [Video Transcoding](https://github.com/donmelton/video_transcoding) fame has brought his expertise to hardware accelerated transcoding in the form of [Other Video Transcoding](https://github.com/donmelton/other_video_transcoding). While Don covers the installation and usage of `other-transcode` for all normal desktop platforms, this repository's focus is using `other-transcode` as a Docker container.
 
-I have leaned _heavily_ on [Julien Rottenberg's](https://github.com/jrottenberg) [ffmpeg](https://github.com/jrottenberg/ffmpeg) Dockerfiles. Basically I've taken them, pulled out some of the extraneous `ffmpeg`
-compile options, added in the `other-transcode` dependencies, and finally bundled in `other-transcode` itself.
+I have leaned _heavily_ on [Julien Rottenberg's](https://github.com/jrottenberg) [ffmpeg](https://github.com/jrottenberg/ffmpeg) Dockerfiles. Basically I've taken them, pulled out some of the extraneous `ffmpeg` compile options, added in the `other-transcode` dependencies, and finally bundled in `other-transcode` itself.
 
+Hardware acceleration being hardware dependent, I again stole an idea from [Julien Rottenberg's](https://github.com/jrottenberg) repositories, and narrowed the scope of each container to a specific hardware target. *This* container is for **Intel** GPUs, and uses [VAAPI](https://en.wikipedia.org/wiki/Video_Acceleration_API).
 
-Because hardware acceleration is, well, hardware dependent, I again stole an idea from [Julien Rottenberg's](https://github.com/jrottenberg)
-repository, and narrowed the scope of each container to a specific hardware target. This container is for Intel
-GPUs, and leverages [VAAPI](https://en.wikipedia.org/wiki/Video_Acceleration_API). Other hardware support, such
-as `NVidia`, will be done in separate repositories.
+The container image version is hard aligned to `other-transcode`, with numerical suffixes representing container modifications not directly related to `other-transcode` such as changes in `FFmpeg` compile options.
 
-Since this container compiles `FFmpeg`, its dependent libraries, and `mpv`, building can take a while to complete.
-The image itself weighs in at ~200MB. While it can be built on any platform, the image is only intended to be run
-on bare metal Linux systems. Virtualized Linux systems further complicate the direct hardware access that
-`other-transcode` relies on, and are not supported. I am using GitHub's `package` facility, so you can
-pull an already built image directly from [here](https://github.com/ttyS0/docker-transcode-vaapi/packages/104690).
+## Requirements
 
-The container image version is hard aligned to `other-transcode`, with numerical suffixes representing container
-modifications not directly related to `other-transcode` such as changes in `FFmpeg` compile options, for example.
+* An Intel GPU. Kaby Lake or better is recommended.
 
+* Exclusive use of the `/dev/dri` device.
 
 ## Usage
 
-In its current form, this container is intended to be used to directly run `other-transcode` as a container.
-As such, the host's `/dev/dri` must be passed in, as well as the current directory bind mounted. In order to
-keep `other-transcode` from attempting to overwrite the source file that's being transcoded, it's suggested
-that the current working directory be considered the `output` directory, and source file(s) be placed in a
-child directory. In short something like this:
+In its current form, this container is setup to directly run `other-transcode`. In order to keep `other-transcode` from attempting to overwrite the source file that's being transcoded, the current working directory is considered the `output` directory, and source file(s) are placed in a child directory. In short something like this:
 
 ```
-output_dir
-\_source_dir
+working_dir
+\_src
   \_source_file.mkv
 ```
 
-where `output_dir` is `$(pwd)`. Using that context, to transcode `source_file.mkv`:
+where `working_dir` is `$(pwd)`.
+
+Using that setup, to transcode `source_file.mkv` with the default H264 encoding, the Docker command looks like this when run from `working_dir`:
 
 ```
-cd output_dir
-docker run --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \ 
+docker run --rm --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \ 
   ttys0/other-transcode-vaapi \
-  source_dir/source_file.mkv
+  src/source_file.mkv
 ```
 
-If you want to pass `other-transcode` options, do so just as if `other-transcode` was being run outside of the
-container. For example, to target a bitrate of 2000 the above example would look like this:
+If you want to pass `other-transcode` options, do so just as if `other-transcode` was being run outside of the container.
+
+For example, to change the target bitrate to 6000Kbs the Docker command would be:
 
 ```
-cd output_dir
-docker run --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \
-  ttys0/other-transcode-vaapi \
-  --target=2000 source_dir/source_file.mkv
+docker run --rm --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \
+  ttys0/other-transcode-nvidia \
+  --target 6000 src/source_file.mkv
 ```
 
-## Potential Problems
+## Gotchas
+
+* **HEVC** is _NOT_ well supported by VAAPI, and _SHOULD BE AVOIDED_ when using this container!! If you _really_ want to transcode with HEVC on a Linux system your best bet is to use an NVidia card. In that case, the [NVidia other-transcode container](https://github.com/ttyS0/docker-transcode-nvidia) is a good option.
 
 * As I try to shave down the required FFmpeg compile options to only those that get used in video transcoding, I  may inadvertently remove some that are actually needed. If you find a codec missing that is "normally" available with `FFmpeg` please make an issue, and I'll add it back in.
+
+* This has only been tested with Ubuntu 18.04.

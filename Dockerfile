@@ -46,7 +46,7 @@ ENV         FFMPEG_VERSION=4.2.2 \
             OPENJPEG_VERSION=2.1.2 \
             X264_VERSION=20191217-2245-stable \
             X265_VERSION=3.2.1 \
-            MPV_VERSION=0.31.0 \
+            MPV_VERSION=0.32.0 \
             OTHER_TRANSCODE_VERSION=0.3.0 \
             SRC=/usr/local
 
