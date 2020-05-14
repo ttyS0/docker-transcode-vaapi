@@ -43,7 +43,7 @@ For example, to change the target bitrate to 6000Kbs the Docker command would be
 
 ```
 docker run --rm --device /dev/dri:/dev/dri -v $(pwd):$(pwd) -w $(pwd) \
-  ttys0/other-transcode-nvidia \
+  ttys0/other-transcode-vaapi \
   --target 6000 src/source_file.mkv
 ```
 
