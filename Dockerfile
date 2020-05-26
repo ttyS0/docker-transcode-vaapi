@@ -47,7 +47,7 @@ ENV         FFMPEG_VERSION=4.2.3 \
             X264_VERSION=20191217-2245-stable \
             X265_VERSION=3.2.1 \
             MPV_VERSION=0.32.0 \
-            OTHER_TRANSCODE_VERSION=0.3.0 \
+            OTHER_TRANSCODE_VERSION=0.3.1 \
             SRC=/usr/local
 
 ARG         FREETYPE_SHA256SUM="5d03dd76c2171a7601e9ce10551d52d4471cf92cd205948e60289251daddffa8 freetype-2.5.5.tar.gz"
