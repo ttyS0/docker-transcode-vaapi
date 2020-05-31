@@ -1,3 +1,7 @@
+## 0.3.1 (2020-05-26)
+
+* bumped [other_transcode to v0.3.1](https://github.com/donmelton/other_video_transcoding/releases/tag/0.3.1)
+
 ## 0.3.0-2 (2020-04-09)
 
 * bumped `MPV` to v0.32.0
