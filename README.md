@@ -1,5 +1,8 @@
 # docker-transcode-vaapi
 
+# THIS REPOSITORY HAS MOVED!!!!
+## Please update links to point to https://github.com/ttyS0/docker-other-transcode
+
 ## About
 
 
